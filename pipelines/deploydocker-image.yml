@@ -1,0 +1,70 @@
+trigger:
+- master
+
+pool: 
+  vmImage: ubuntu-latest
+
+variables:
+  solution: "**/*.sln"
+  buildPlataform: 'Any CPU'
+  buildConfiguration: 'Release'
+  imageRepository: myapp
+
+jobs:
+  - job: BuildDockerImage
+    displayName: Build Docker Image
+    steps:
+      - task: UseDotNet@2
+        displayName: 'Install .NET 6.x (for GitVersion)'
+        inputs:
+          packageType: sdk
+          version: 6.x
+
+      - task: PowerShell@2
+        displayName: Install GitVersion
+        inputs:
+          targetType: 'inline'
+          script: |
+            if(!(dotnet tool list -g | Select-String -Pattern "dotnet-gitversion")){
+            dotnet tool install --ignore-failed-sources --global GitVersion.Tool
+            }
+
+      - task: PowerShell@2
+        displayName: Run GitVersion
+        inputs:
+          targetType: 'inline'
+          script: 'dotnet-gitversion /output buildserver /nofetch /config ./GitVersion.yml'
+
+      - task: PowerShell@2
+        displayName: Prepare tag
+        inputs:
+          targetType: 'inline'
+          script: |
+            $buildNumber = "$(GitVersion.SemVer)"
+            $tag = $buildNumber.Replace("+", "")
+            $tag = $tag.Replace("-", "")
+            Write-Host "##vso[task.setvariable variable=dockertag;]$tag"
+            
+      - task: DockerInstaller@0
+        displayName: Install docker
+
+      - task: Docker@2
+        displayName: Login on container registry
+        inputs:
+          containerRegistry: '[YOUR CONTAINER REGISTRY]'
+          command: 'login'
+
+      - task: Docker@2
+        displayName: Build and publish image
+        inputs:
+          containerRegistry: '[YOUR CONTAINER REGISTRY]'
+          repository: '$(imageRepository)'
+          command: 'buildAndPush'
+          Dockerfile: '**/MyApp.Api/Dockerfile'
+          buildContext: '$(Build.SourcesDirectory)'
+          tags: |
+            $(dockertag)
+
+      - task: git-tag-on-release-task@9
+        displayName: 'Create tag $(dockertag)'
+        condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))

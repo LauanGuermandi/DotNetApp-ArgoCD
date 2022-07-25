@@ -1,0 +1,23 @@
+﻿branches: 
+  develop: 
+    increment: Patch
+    mode: ContinuousDelivery
+    regex: ^develop$
+    tag: rc
+  hotfix: 
+    increment: Patch
+    mode: ContinuousDelivery
+    regex: "hotfix?[/-]"
+    tag: fix
+  master: 
+    increment: Minor
+    mode: ContinuousDelivery
+    regex: ^master$
+    tag: ""
+  release: 
+    increment: Patch
+    mode: ContinuousDelivery
+    regex: "release?[/-]"
+    tag: beta
+mode: ContinuousDelivery
+assembly-versioning-scheme: MajorMinorPatch
